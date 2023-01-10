@@ -1,10 +1,29 @@
+# Script name: InterfaceTrafficUsageReport
+#
+#----------SCRIPT INFORMATION---------------------------------------------------
+#
+# Script:  Mikrotik RouterOS automatic interfaces traffic usage report
+# Version: 22.07.15
+# Created: 01/09/2023
+# Updated: 01/10/2023
+# Author:  Pourya Sharifi & Hossein Yeganeh
+# Website: https://github.com/pouryash
+# You can contact me by e-mail at pouryasharifi78@mail.com
+#
+# IMPORTANT!
+# Minimum supported RouterOS version is v6.43.7
+#
+#----------MODIFY THIS SECTION AS NEEDED----------------------------------------
+## Notification e-mail
+## (Make sure you have configurated Email settings in Tools -> Email)
+:local emailAddress "yourmail@example.com";
 {
 :local SMP "traffic analysis"
-:local emailAddress "yourmail@example.com";
-:local mailSubject  "Traffic Usage Report";
+:local emailAddress "h.yeganehkari@gmail.com";
+:local mailSubject  "Mikrotik RouterOS Interfaces Traffic Report";
 :local mailBody;
 :local mailBodyHeader "Mikrotik interface's traffic usage script were created and attached to this email.";
-:local mailBodyCopyright 	"\r\n\r\nMikrotik RouterOS automatic backup & update (ver. $scriptVersion) \r\nhttps://github.com/beeyev/Mikrotik-RouterOS-automatic-backup-and-update";
+:local mailBodyCopyright 	"\r\n\r\nMikrotik RouterOS automatic interface report usage \r\nhttps://github.com/pouryash/Mikrotik-RouterOS-automatic-interfaces-traffic-usage-report";
 :local deviceOsVerInst 			[/system package update get installed-version];
 :local deviceOsVerInstNum 		[$buGlobalFuncGetOsVerNum paramOsVer=$deviceOsVerInst];
 :local deviceOsVerAvail 		"";
@@ -16,8 +35,22 @@
 :local deviceIdentityName 		[/system identity get name];
 :local deviceIdentityNameShort 	[:pick $deviceIdentityName 0 18]
 :local deviceUpdateChannel 		[/system package update get channel];
+:local exportDate              [/system clock get value-name=date];
+:local exportTime              [/system clock get value-name=time];
 
-:local mailBodyDeviceInfo	"\r\n\r\nDevice information: \r\nIdentity: $deviceIdentityName \r\nModel: $deviceRbModel \r\nSerial number: $deviceRbSerialNumber \r\nCurrent RouterOS: $deviceOsVerInst ($[/system package update get channel]) $[/system resource get build-time] \r\nCurrent routerboard FW: $deviceRbCurrentFw \r\nDevice uptime: $[/system resource get uptime]";
+#careate date time without delimiter
+:local datetime;
+:local month [:tostr ([:find "janfebmaraprmayjunjulaugsepoctnovdec" [:pick $exportDate 0 3]]/3+1)]
+  :if ([:tonum $month]<10) do={
+    :set month "0$month"
+  }
+  :set datetime ( \
+    [:pick $exportDate 9 11].$month.[:pick $exportDate 4 6]."_". \
+    [:pick $exportTime 0 2].[:pick $exportTime 3 5].[:pick $exportTime 6 8] \
+  )
+  
+:local mailAttachmentsName              "TR_$deviceIdentityName_$datetime.txt"
+:local mailBodyDeviceInfo	"\r\n\r\nDevice information: \r\nIdentity: $deviceIdentityName \r\nModel: $deviceRbModel \r\nSerial number: $deviceRbSerialNumber \r\nCurrent RouterOS: $deviceOsVerInst ($[/system package update get channel]) $[/system resource get build-time] \r\nCurrent routerboard FW: $deviceRbCurrentFw \r\nDevice uptime: $[/system resource get uptime] \r\nExport date: $exportDate $exportTime";
 
 :local iname;
 :local idefName;
@@ -39,13 +72,18 @@
 :set $total (($mbpsTX+$mbpsRX));
 :set $result "$result\n\nInterface: $idefName\nName: $iname\nDownload: $mbpsRX MB\nUpload: $mbpsTX MB\nTotal: $total MB";
 
-:set mailBody "$mailBodyHeader\n\n$mailBodyDeviceInfo\n\n$result";
-
 }
+
+#add report generating time
+:set $result "$mailSubject\n$mailBodyDeviceInfo\n$result"
+
+:set mailBody "$mailBodyHeader\n$mailBodyCopyright\n$mailBodyDeviceInfo";
+
 # Create file.
-#    /file print file=$filename
+    /file print file=$mailAttachmentsName
 # Set file's content.
-#    /file set $filename contents=$content
+    /file set $mailAttachmentsName contents=$result
+
 
 ##
 ## SENDING EMAIL
@@ -54,27 +92,27 @@
 
 
 	:log info "$SMP Sending email message, it will take around half a minute...";
-	:do {/tool e-mail send to=$emailAddress subject=$mailSubject body=$mailBody;} on-error={
+	:do {/tool e-mail send to=$emailAddress subject=$mailSubject body=$mailBody file=$mailAttachmentsName;} on-error={
 		:delay 5s;
 		:log error "$SMP could not send email message ($[/tool e-mail get last-status]). Going to try it again in a while."
 
 		:delay 5s;
 
-		:do {/tool e-mail send to=$emailAddress subject=$mailSubject body=$mailBody} on-error={
+		:do {/tool e-mail send to=$emailAddress subject=$mailSubject body=$mailBody file=$mailAttachmentsName;} on-error={
 			:delay 5s;
 			:log error "$SMP could not send email message ($[/tool e-mail get last-status]) for the second time."
 
 		}
 	}
-
+	
 	:delay 30s;
 	
-	:if ([/tool e-mail get last-status] = "succeeded") do={
+	:if ([:len $mailAttachmentsName] > 0 and [/tool e-mail get last-status] = "succeeded") do={
 		:log info "$SMP File system cleanup."
-		/file remove $mailAttachments; 
+		/file remove $mailAttachmentsName; 
 		:delay 2s;
 	}
-	
+
 }
 
 }
