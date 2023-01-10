@@ -16,10 +16,9 @@
 #----------MODIFY THIS SECTION AS NEEDED----------------------------------------
 ## Notification e-mail
 ## (Make sure you have configurated Email settings in Tools -> Email)
-:local emailAddress "yourmail@example.com";
 {
 :local SMP "traffic analysis"
-:local emailAddress "h.yeganehkari@gmail.com";
+:local emailAddress "yourmail@example.com";
 :local mailSubject  "Mikrotik RouterOS Interfaces Traffic Report";
 :local mailBody;
 :local mailBodyHeader "Mikrotik interface's traffic usage script were created and attached to this email.";
